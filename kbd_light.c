@@ -14,9 +14,16 @@ char const * ev_files[] = {
 	PATH_EV_PREFIX "platform-thinkpad_acpi-event"
 };
 
+void print_raw_bytes(uint8_t * buf, ssize_t size) {
+	printf("[%ld] ", size);
+	for(ssize_t i = 0; i < size; ++i)
+		printf("%02x ", buf[i]);
+	putchar('\n');
+}
+
 int main() {
 	int fd = open(ev_files[0], O_RDONLY);
-	
+
 	if(fd == -1) {
 		perror("[!] open");
 		return 1;
@@ -32,9 +39,6 @@ int main() {
 			return 1;
 		}
 
-		printf("read: ");
-		for(ssize_t i = 0; i < nb_chrs; ++i)
-			printf("%02x ", buf[i]);
-		putchar('\n');
+		print_raw_bytes(buf, nb_chrs);
 	}
 }
