@@ -122,6 +122,7 @@ int main() {
 	open_ev_files(fds);
 	atexit(disable_light);
 	signal(SIGINT, exit);
+	signal(SIGTERM, exit);
 
 	int err = 0;
 	while(1) {
