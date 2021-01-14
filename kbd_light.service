@@ -1,0 +1,9 @@
+[Unit]
+Description=Control keyboard backlight using platform input events
+After=sys-devices-platform-thinkpad_acpi-leds-tpacpi::kbd_backlight.device
+
+[Service]
+ExecStart=/usr/local/sbin/kbd_light
+
+[Install]
+WantedBy=multi-user.target
