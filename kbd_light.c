@@ -1,5 +1,6 @@
 #include <fcntl.h>
 #include <linux/input.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -32,44 +33,57 @@ void print_ev(struct input_event const * ev) {
 			ev->value);
 }
 
-void open_ev_files(int * fds) {
+void open_ev_files(struct pollfd * fds) {
 	for(size_t i = 0; i < ev_files_size; ++i) {
-		fds[i] = open(ev_files[i], O_RDONLY);
+		fds[i].fd = open(ev_files[i], O_RDONLY);
 
-		if(fds[i] == -1) {
+		if(fds[i].fd == -1) {
 			char buf[1024];
 			sprintf(buf, "[!] opening \"%s\"", ev_files[i]);
 			perror(buf);
-			while(i) close(fds[--i]);
+			while(i) close(fds[--i].fd);
 			exit(1);
 		}
+		
+		fds[i].events = POLLIN;
 	}
 }
 
-void close_ev_files(int * fds) {
+void close_ev_files(struct pollfd * fds) {
 	for(size_t i = 0; i < ev_files_size; ++i)
-		close(fds[i]);
+		close(fds[i].fd);
+}
+
+void consume_data(struct pollfd * fd) {
+	uint8_t buf[4096];
+	struct input_event * evs = (void *) buf;
+	ssize_t nb_chrs = read(fd->fd, buf, 4096);
+	ssize_t nb_evs = nb_chrs / sizeof(struct input_event);
+
+	print_raw_bytes(buf, nb_chrs);
+	for(ssize_t i = 0; i < nb_evs; ++i)
+		print_ev(evs + i);
 }
 
 int main() {
-	int fds[ev_files_size];
+	struct pollfd fds[ev_files_size];
 	open_ev_files(fds);
 
+	int cnt = 0;
 	while(1) {
-		uint8_t buf[4096];
-		struct input_event * evs = (void *) buf;
-		ssize_t nb_chrs = read(fds[0], buf, 4096);
-		ssize_t nb_evs = nb_chrs / sizeof(struct input_event);
+		poll(fds, ev_files_size, -1);
+		for(struct pollfd * fd = fds; fd != fds + ev_files_size; ++fd) {
+			if(fd->revents & POLLERR) {
+				perror("[!] poll");
+				close_ev_files(fds);
+				return 1;
+			}
 
-		if(nb_chrs < 0) {
-			perror("[!] read");
-			close_ev_files(fds);
-			return 1;
+			if(fd->revents & POLLIN) {
+				consume_data(fd);
+				printf("event %d\n", cnt++);
+			}
 		}
-
-		print_raw_bytes(buf, nb_chrs);
-		for(ssize_t i = 0; i < nb_evs; ++i)
-			print_ev(evs + i);
 	}
 
 	close_ev_files(fds);
