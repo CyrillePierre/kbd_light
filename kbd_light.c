@@ -1,6 +1,7 @@
 #include <fcntl.h>
 #include <linux/input.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -10,16 +11,20 @@
 
 //#define DEBUG 1
 
+#define PATH_KBD_BACKLIGHT "/sys/class/leds/tpacpi::kbd_backlight/brightness"
 #define PATH_EV_PREFIX "/dev/input/by-path/"
 
+unsigned int const brightness_level = 1;
 unsigned int const read_delay_ms = 100;
+unsigned int const backlight_timeout_ms = 4000;
 
-char const * ev_files[] = {
+char const * const ev_files[] = {
 	PATH_EV_PREFIX "platform-i8042-serio-0-event-kbd",
 	PATH_EV_PREFIX "platform-i8042-serio-1-event-mouse",
 	PATH_EV_PREFIX "platform-i8042-serio-2-event-mouse",
 };
 size_t ev_files_size = sizeof ev_files / sizeof(char *);
+
 
 void print_raw_bytes(uint8_t * buf, size_t size) {
 	printf("[%ld] ", size);
@@ -87,13 +92,49 @@ void consume_all_data(struct pollfd fds[]) {
 	}
 }
 
-int main() {
-	struct pollfd fds[ev_files_size];
-	open_ev_files(fds);
+int set_kbd_light(int state) {
+	char buf[10];
+	int fd = open(PATH_KBD_BACKLIGHT, O_WRONLY);
+	if(fd == -1) {
+		perror("[!] opening \"" PATH_KBD_BACKLIGHT "\"");
+		return -1;
+	}
 
+	int nb_chrs = sprintf(buf, "%d\n", state);
+	write(fd, buf, nb_chrs);
+	if(fd == -1) {
+		perror("[!] writing in \"" PATH_KBD_BACKLIGHT "\"");
+		return -1;
+	}
+
+	close(fd);
+	return 0;
+}
+
+void disable_light() {
+	set_kbd_light(0);
+}
+
+int main() {
+	int light_state = 0;
+	struct pollfd fds[ev_files_size];
+
+	open_ev_files(fds);
+	atexit(disable_light);
+	signal(SIGINT, exit);
+
+	int err = 0;
 	while(1) {
-		int nb = poll(fds, ev_files_size, -1);
-		if(nb) consume_all_data(fds);
+		int nb = poll(fds, ev_files_size, backlight_timeout_ms);
+		if(nb) {
+			consume_all_data(fds);
+			if(!light_state)
+				err = set_kbd_light(light_state = brightness_level);
+		}
+		else if(light_state)
+			err = set_kbd_light(light_state = 0);
+
+		// this delay allows to reduce system calls for input events
 		usleep(read_delay_ms * 1000);
 	}
 
