@@ -8,7 +8,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+//#define DEBUG 1
+
 #define PATH_EV_PREFIX "/dev/input/by-path/"
+
+unsigned int const read_delay_ms = 100;
 
 char const * ev_files[] = {
 	PATH_EV_PREFIX "platform-i8042-serio-0-event-kbd",
@@ -56,34 +60,41 @@ void close_ev_files(struct pollfd * fds) {
 
 void consume_data(struct pollfd * fd) {
 	uint8_t buf[4096];
-	struct input_event * evs = (void *) buf;
 	ssize_t nb_chrs = read(fd->fd, buf, 4096);
+
+#ifdef DEBUG
+	struct input_event * evs = (void *) buf;
 	ssize_t nb_evs = nb_chrs / sizeof(struct input_event);
 
 	print_raw_bytes(buf, nb_chrs);
 	for(ssize_t i = 0; i < nb_evs; ++i)
 		print_ev(evs + i);
+#else
+	(void) nb_chrs;
+#endif
+}
+
+void consume_all_data(struct pollfd fds[]) {
+	for(struct pollfd * fd = fds; fd != fds + ev_files_size; ++fd) {
+		if(fd->revents & POLLERR) {
+			perror("[!] poll");
+			close_ev_files(fds);
+			exit(1);
+		}
+
+		if(fd->revents & POLLIN)
+			consume_data(fd);
+	}
 }
 
 int main() {
 	struct pollfd fds[ev_files_size];
 	open_ev_files(fds);
 
-	int cnt = 0;
 	while(1) {
-		poll(fds, ev_files_size, -1);
-		for(struct pollfd * fd = fds; fd != fds + ev_files_size; ++fd) {
-			if(fd->revents & POLLERR) {
-				perror("[!] poll");
-				close_ev_files(fds);
-				return 1;
-			}
-
-			if(fd->revents & POLLIN) {
-				consume_data(fd);
-				printf("event %d\n", cnt++);
-			}
-		}
+		int nb = poll(fds, ev_files_size, -1);
+		if(nb) consume_all_data(fds);
+		usleep(read_delay_ms * 1000);
 	}
 
 	close_ev_files(fds);
