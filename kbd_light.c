@@ -115,14 +115,18 @@ void disable_light() {
 	set_kbd_light(0);
 }
 
+void exit_ok() {
+	exit(0);
+}
+
 int main() {
 	int light_state = 0;
 	struct pollfd fds[ev_files_size];
 
 	open_ev_files(fds);
 	atexit(disable_light);
-	signal(SIGINT, exit);
-	signal(SIGTERM, exit);
+	signal(SIGINT, exit_ok);
+	signal(SIGTERM, exit_ok);
 
 	int err = 0;
 	while(!err) {
@@ -140,4 +144,5 @@ int main() {
 	}
 
 	close_ev_files(fds);
+	exit(1);
 }
