@@ -125,7 +125,7 @@ int main() {
 	signal(SIGTERM, exit);
 
 	int err = 0;
-	while(1) {
+	while(!err) {
 		int nb = poll(fds, ev_files_size, backlight_timeout_ms);
 		if(nb) {
 			consume_all_data(fds);

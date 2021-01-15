@@ -1,0 +1,5 @@
+# udev configuration
+# Add 'systemd' TAG to plaform devices in order to interract 
+# with this files in services
+
+ACTION=="add", SUBSYSTEMS=="serio", TAG+="systemd"
