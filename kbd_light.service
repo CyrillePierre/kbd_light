@@ -1,16 +1,21 @@
 [Unit]
 Description=Control keyboard backlight using platform input events
-BindsTo=sys-devices-platform-thinkpad_acpi-leds-tpacpi::kbd_backlight.device \
-		sys-devices-platform-i8042-serio0-input-input0-event0.device \
-		sys-devices-platform-i8042-serio1-input-input7-event6.device \
-		sys-devices-platform-i8042-serio1-serio2-input-input8-event7.device
+#BindsTo=sys-devices-platform-thinkpad_acpi-leds-tpacpi::kbd_backlight.device \
+#		sys-devices-platform-i8042-serio0-input-input0-event0.device \
+#		sys-devices-platform-i8042-serio1-input-input7-event6.device \
+#		sys-devices-platform-i8042-serio1-serio2-input-input8-event7.device
 After=sys-devices-platform-thinkpad_acpi-leds-tpacpi::kbd_backlight.device \
 	  sys-devices-platform-i8042-serio0-input-input0-event0.device \
 	  sys-devices-platform-i8042-serio1-input-input7-event6.device \
 	  sys-devices-platform-i8042-serio1-serio2-input-input8-event7.device
+StartLimitBurst=3
+StartLimitIntervalSec=4
 
 [Service]
+ExecStartPre=/bin/sleep .4
 ExecStart=/usr/local/sbin/kbd_light
+Restart=on-failure
+RestartSec=300ms
 
 [Install]
 WantedBy=multi-user.target
